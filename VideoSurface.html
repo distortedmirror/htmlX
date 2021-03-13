@@ -1,0 +1,302 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+    <style type="text/css">
+        .canvasMain {
+            position: fixed;
+            left: 0%;
+            top: 0%;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+    <script type="text/javascript">
+        var gl;
+        var canvas;
+        var geom;
+        var vertexPositionAttribute;
+        var vertexColorAttribute;
+        var uvAttribute;
+        var modelViewMatrix;
+        var projectionMatrix;
+        var vertexBuffer;
+        var colorsBuffer = null;
+        var shaderProgram;
+        var vertexShader;
+        var uvBuffer;
+        var uvArray;
+        var triangles3d = null;
+        var textureWave = null;
+        var colors = null;
+        var fragmentShader = null;
+
+        var imgWave = document.getElementById("videoRendered");;
+        var drawWait = 6;
+        var waveTimer = 0.0;
+        var waveTimer2 = 0.0;
+        var waveTick = 2.0;
+        var waveTick2 = 1.0;
+        var xx = 0.01;
+        var yy = 0.01;
+        var zz = 0.01;
+        var tx = -1.0;
+        var ty = 0.0;
+        var tz = -10.0;
+        var ss = 5.0;
+        var STEPS = 122.0;
+        var WAVEW = 55.0;
+        var XSCALE = 1.0;
+        var YSCALE = 1.0;
+        var ZSCALE = 0.1055;
+        modelViewMatrix = new Float32Array(
+            [ss * Math.cos(zz) * Math.cos(yy), -Math.sin(zz), Math.sin(yy), 0.0,
+                    Math.sin(zz), ss * Math.cos(xx) * Math.cos(zz), -Math.sin(xx), 0.0,
+                    -Math.sin(yy), Math.sin(xx), ss * Math.cos(xx) * Math.cos(yy), 0.0,
+                     tx, ty, tz, 1.0]
+       );
+        projectionMatrix = new Float32Array(
+        [2.41421, 0, 0, 0,
+        0, 2.41421, 0, 0,
+        0, 0, -1.002002, -1,
+        0, 0, -0.2002002, 0]);
+        var fragmentShaderSource = "precision mediump float;\n" +
+                                "varying lowp vec4 vColor;\n" +
+                                "uniform sampler2D img;\n" +
+                                "varying lowp vec2 texUV;\n" +
+                                "varying lowp vec2 waveTimerShade;\n" +
+                                "void main(void){gl_FragColor=texture2D(img,texUV);}";
+        var vertexShaderSource = "#define XRATIO 0.1\n" +
+            "#define YRATIO 0.1\n" +
+            "#define XCYCLE 18.0\n" +
+            "#define YCYCLE 18.0\n" +
+            "attribute vec3 aVertexPosition;\n" +
+                                "attribute vec4 aVertexColor;\n" +
+                                "attribute vec2 aTextUV;\n" +
+                                "uniform vec2 waveTimer;\n" +
+                                "uniform mat4 uPMatrix;\n" +
+                                "uniform mat4 uMVMatrix;\n" +
+                                "varying lowp vec2 waveTimerShade;\n" +
+                                "varying lowp vec4 vColor;\n" +
+                                "varying lowp vec2 texUV;\n" +
+                                "void main(void){texUV=aTextUV;" +
+                                "waveTimerShade=waveTimer;gl_Position=uPMatrix*uMVMatrix*(vec4(aVertexPosition,1.0)" +
+                               "+vec4(0.0,0.0,XRATIO*sin((waveTimer[1] /100.0)*aVertexPosition.x*XCYCLE*3.14)+" +
+                                            "YRATIO*cos((waveTimer[0] /100.0)*aVertexPosition.y*YCYCLE*3.14),1.0));" +
+                                "vColor=aVertexColor;}";
+
+        function loaded() {
+            canvas = document.getElementById("canvasMain");
+            try { gl = canvas.getContext("webgl"); } catch (e) { alert(msg); }
+            gl.viewport(0, 0, canvas.width, canvas.height);
+            imgWave = document.getElementById("videoRendered");
+            loadGeom();
+            loadTexture();
+            initShaders();
+            draw();
+        }
+
+        function draw() {
+            try {
+
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, imgWave);
+
+
+                gl.clearColor(1.0, 1.0, 1.0, 0.0);
+                gl.enable(gl.DEPTH_TEST);
+                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+                gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uPMatrix"),
+                                false, new Float32Array(projectionMatrix));
+
+                var trsfrm = [ss * Math.cos(zz) * Math.cos(yy), -Math.sin(zz), Math.sin(yy), 0.0,
+                        Math.sin(zz), ss * Math.cos(xx) * Math.cos(zz), -Math.sin(xx), 0.0,
+                        -Math.sin(yy), Math.sin(xx), ss * Math.cos(xx) * Math.cos(yy), 0.0,
+                         tx, ty, tz, 1.0];
+                modelViewMatrix = new Float32Array(
+                   trsfrm
+               );
+                gl.uniformMatrix4fv(gl.getUniformLocation(shaderProgram, "uMVMatrix"),
+                                false, new Float32Array(modelViewMatrix));
+                gl.uniform2fv(gl.getUniformLocation(shaderProgram, "waveTimer"),
+                                 new Float32Array([waveTimer, waveTimer2]));
+
+                gl.uniform1i(gl.getUniformLocation(shaderProgram, "img"), 0);
+                gl.drawArrays(gl.TRIANGLES, 0, triangles3d.length / 3);
+
+                setTimeout('waveTimer2+=waveTick2;waveTimer +=waveTick;if(waveTimer>=100 ||waveTimer<=0){waveTick*=-1;}' +
+                    'if(waveTimer2>=100 ||waveTimer2<=0){waveTick2*=-1;}  ' +
+                    'window.requestAnimationFrame(draw, canvas);', drawWait);
+
+            } catch (e) {; }
+        }
+        function initShaders() {
+            if (fragmentShader != null) { return; }
+            fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+            gl.shaderSource(fragmentShader, fragmentShaderSource);
+            gl.compileShader(fragmentShader);
+            vertexShader = gl.createShader(gl.VERTEX_SHADER);
+            gl.shaderSource(vertexShader, vertexShaderSource);
+            gl.compileShader(vertexShader);
+            shaderProgram = gl.createProgram();
+            gl.attachShader(shaderProgram, vertexShader);
+            gl.attachShader(shaderProgram, fragmentShader);
+            gl.linkProgram(shaderProgram);
+            gl.useProgram(shaderProgram);
+            vertexPositionAttribute =
+                gl.getAttribLocation(shaderProgram, "aVertexPosition");
+            gl.enableVertexAttribArray(vertexPositionAttribute);
+            vertexColorAttribute =
+                 gl.getAttribLocation(shaderProgram, "aVertexColor");
+            gl.enableVertexAttribArray(vertexColorAttribute);
+            uvAttribute =
+                 gl.getAttribLocation(shaderProgram, "aTextUV");
+            gl.enableVertexAttribArray(uvAttribute);
+            uvBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, uvBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(uvArray), gl.STATIC_DRAW);
+            gl.enableVertexAttribArray(vertexColorAttribute);
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+            gl.vertexAttribPointer(vertexPositionAttribute, 3, gl.FLOAT, false, 0, 0);
+            gl.bindBuffer(gl.ARRAY_BUFFER, colorsBuffer);
+            gl.vertexAttribPointer(vertexColorAttribute, 4, gl.FLOAT, false, 0, 0);
+            gl.bindBuffer(gl.ARRAY_BUFFER, uvBuffer);
+            gl.vertexAttribPointer(uvAttribute, 2, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(uvAttribute); gl.bindBuffer(gl.ARRAY_BUFFER, uvBuffer);
+            gl.vertexAttribPointer(uvAttribute, 2, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(uvAttribute);
+        }
+        function loadTexture() {
+            if (colorsBuffer != null) {
+                return;
+            }
+            colorsBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, colorsBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER,
+                new Float32Array(colors), gl.STATIC_DRAW);
+            textureWave = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, textureWave);
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, imgWave);
+
+        }
+        function loadGeom() {
+
+            if (triangles3d != null) { return; }
+            vertexBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+            var verts = [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0];
+            uvArray = [];
+            colors = [];
+            triangles3d = [];
+            var canv = document.getElementById('canvasOffscreen');
+            for (var dx = -0; dx <= XSCALE; dx += XSCALE / STEPS)
+                for (var dy = -0; dy <= YSCALE; dy += YSCALE / STEPS) {
+                    for (var vc = 0; vc < verts.length; vc += 3) {
+                        var x = dx + 2.0 * parseFloat(verts[vc]) / STEPS;
+                        var y = dy + 2.0 * parseFloat(verts[vc + 1]) / STEPS;
+                        var z = 1.0;
+                        triangles3d.push(x);
+                        triangles3d.push(y);
+                        triangles3d.push(z);
+                        uvArray.push(x);
+                        uvArray.push(y);
+                        colors.push(1.0);
+                        colors.push(1.0);
+                        colors.push(1.0);
+                        colors.push(1.0);
+                    }
+                }
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangles3d), gl.STATIC_DRAW);
+            geom = { buffer: vertexBuffer, vertSize: 3, nVerts: triangles3d.length, primtype: gl.TRIANGLE_STRIP };
+
+        }
+    </script>
+
+</head>
+<body onload="loaded();">
+        <textarea style="position: fixed; bottom:0px;right:0px;z-index:1234;" onchange="if(confirm('Run\n'+this.value)){eval(this.value);}">
+imgWave.src='gf.mp4';
+STEPS = 122.0;
+WAVEW = 2.0;
+XSCALE = 1.0;
+YSCALE = 1.0;
+ZSCALE = 0.1055;
+drawWait = 6;
+waveTick = 2.0;
+waveTick2 = 1.0;
+xx = 0.01;
+yy = 0.01;
+zz = 0.01;
+tx = -1.0;
+ty = 0.0;
+tz = -10.0;
+ss = 5.0;
+triangles3d=null;
+loadGeom();
+
+            colorsBuffer=null;
+fragmentShader=null;
+loadTexture();
+            initShaders();
+            draw();</textarea> <textarea style="position: fixed; bottom:0px;left:0px;z-index:1234;" 
+    onchange="if(confirm('Run\n'+this.value)){vertexShaderSource =this.value;fragmentShader=null;initShaders();}">
+    #define XRATIO 4.0
+#define YRATIO 4.0
+#define XCYCLE 18.0
+#define YCYCLE 18.0
+attribute vec3 aVertexPosition;
+attribute vec4 aVertexColor;
+attribute vec2 aTextUV;
+uniform vec2 waveTimer;
+uniform mat4 uPMatrix;
+uniform mat4 uMVMatrix;
+varying lowp vec2 waveTimerShade;
+varying lowp vec4 vColor;
+varying lowp vec2 texUV;
+void main(void){texUV=aTextUV;waveTimerShade=waveTimer;gl_Position=uPMatrix*uMVMatrix*(vec4(aVertexPosition,1.0)+vec4(0.0,0.0,0.10*sin(12.0*(waveTimer[1] /100.0)*aVertexPosition.x*XRATIO *aVertexPosition.y*YRATIO ),1.0));vColor=aVertexColor;}</textarea>
+    <canvas id="canvasMain" style="position: fixed; display: inline; left: 0px; top: 0px; opacity: 0.88; background-color: transparent;" width="1024" height="1024"></canvas>
+    <div style="visibility: hidden;">
+        <img src="GFORCE.gif" id="videoWave" width="1024" height="1024" />
+        <video preload="auto" autoplay="autoplay" width="1024" height="1024" id="videoRendered"
+            src="gf.mp4" loop="loop" style="opacity: 0.66; background-color: transparent;">
+        </video>
+     </div>
+    <div style="position: fixed; display: inline; right: 0px; top: 0px; width: 165px;">
+        <br />
+
+        <div id="ID765" style="position: relative; background-color: transparent; opacity: .5; -webkit-transform: rotateZ(0deg); z-index: 45;">
+            <div id="ID5d2dd3" style="position: relative; top: 5px; left: 5px; width: 100px; height: 100px; -webkit-transform: scale(0.8); background-color: green; opacity: .5; azimuth: ;">
+            </div>
+            <div id="ID5d23" style="position: absolute; top: 5px; left: 5px; width: 100px; height: 100px; -webkit-transform: rotateX(66deg); background-color: red; opacity: .5; azimuth: ;">
+            </div>
+            <div id="ID826" min="-9999" max="9999" step="1" style="position: absolute; top: 5px; left: 5px; width: 100px; height: 100px; -webkit-transform: rotateY(66deg); background-color: blue; opacity: .5; azimuth: ;">
+            </div>
+            <br />
+            S:<input type="number" id="rangeScale" value="5" min="-88888" max="88888" step=".25" style="width: 105px;"
+                onchange="ss=this.value;draw();" />
+            <br />
+
+            X<input value="-1" min="-9999" max="9999" step=".25" type="number" onchange="tx=0.000001+parseFloat(this.value);draw();" />
+            <br />
+            Y<input value="0" type="number" step=".25"  onload="this.value=ty;" style="width: 100px;" 
+                onchange="ty=0.000001+parseFloat(this.value);draw();" />
+            <br />
+            Z<input value="-10.0" min="-9999" max="9999" step=".25" style="width: 100px;" type="number" onchange="tz=0.000001+parseFloat(this.value);draw();" />
+
+        </div>
+        <br />
+        <div>
+            <input type="range" id="rangeRotateY" value="0" min="-179" max="179" step="1" style="position: relative; -webkit-transform-origin: 1 1; -webkit-transform: rotateZ(-180deg); width: 105px;" 
+                onchange="yy=(parseFloat(this.value==0?yy:this.value)/360.0)*Math.PI; draw();" />
+            <input type="range" id="rangeRotateZ" style="position: relative; -webkit-transform: rotateZ(45deg); -webkit-transform-origin: 1 1; MARGIN-TOP: 25PX;" value="0" min="-179" max="179" step="1" style="width: 105px;" onchange="xx=(parseFloat(this.value==0?xx:this.value)/360.0)*Math.PI;draw();" />
+            <input type="range" id="rangeRotateX" style="position: relative; -webkit-transform: rotateZ(-90deg); -webkit-transform-origin: 0 0; margin-top: 75px;" value="0" min="-179" max="179" step="1" style="width: 105px;"
+                onchange="zz=(parseFloat(this.value==0?zz:this.value)/360.0)*Math.PI; draw();" />
+
+        </div>
+</body>
+</html>

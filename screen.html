@@ -1,0 +1,52 @@
+<html>
+  <style type="text/css">
+    body { background-color:black;overflow:auto;color:gold;}
+    form { }
+    input[type=image]{position:absolute;top:45px;left:0px;}
+    select,input[type=text]{position:relative;display:inline;bottom:0px;}
+    div{position:fixed;right:6px;top:8px;font-size:16px;}
+  </style>
+  <body onload="document.getElementById('txt').focus();">
+    <form action="/screen.html" method="GET">
+      <input src="/screen.jpg" type="image"/>
+      <input id="txt" name="txt" type="text"/>
+      <select name="key" onchange="document.getElementById('txt').focus();">
+	      <option value="">
+	      </option>
+	      <option value="Return" >Return</option>
+	      <option value="Escape">Escape</option>
+	      <option value="BackSpace">BackSpace</option>
+	      <option value="Del">Del</option>
+	      <option value="Page_Up">pgup</option>
+	      <option value="Page_Down">pgdn</option>
+	      <option value="ctrl">ctrl</option>
+	      <option value="shift">shift</option>
+	      <option value="alt">alt</option>
+	      <option value="ctrlPLUSa">ctrl+a</option>
+	      <option value="ctrlPLUSb">ctrl+b</option>
+	      <option value="ctrlPLUSc">ctrl+c</option>
+	      <option value="ctrlPLUSd">ctrl+d</option>
+	      <option value="ctrlPLUSe">ctrl+e</option>
+	      <option value="ctrlPLUSg">ctrl+g</option>
+	      <option value="ctrlPLUSk">ctrl+k</option>
+	      <option value="ctrlPLUSl">ctrl+l</option>
+	      <option value="ctrlPLUSn">ctrl+n</option>
+	      <option value="ctrlPLUSp">ctrl+p</option>
+	      <option value="ctrlPLUSp">ctrl+p</option>
+	      <option value="ctrlPLUSu">ctrl+u</option>
+	      <option value="ctrlPLUSx">ctrl+x</option>
+	      <option value="ctrlPLUSz">ctrl+z</option>
+      </select>
+      <select name="mouse">
+	      <option value="click">click</option>
+	      <option value="mousedown">mousedown</option>
+	      <option value="mouseup">mouseup</option>
+      </select>
+      <select name="mousebtn">
+	      <option value="1">left</option>
+	      <option value="3">right</option>
+      </select>
+      <div>httpX</div>
+    </form>
+  </body>
+</html>

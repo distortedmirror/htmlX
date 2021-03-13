@@ -1,0 +1,1 @@
+xdotool type $1
