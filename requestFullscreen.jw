@@ -1,0 +1,1 @@
+window.top.document.documentElement.requestFullscreen();
